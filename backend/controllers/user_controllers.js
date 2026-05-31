@@ -3,10 +3,14 @@ const bycrypt = require('bcrypt');
 const twilo = require('twilio')
 const { where } = require('sequelize');
 const { validate: isUuid } = require("uuid");
+const jwt = require('jsonwebtoken');
 const generateOTP = () => {
     return (Math.random() * 1000000).toFixed()
 }
 const otp = generateOTP()
+const generateToken = (id, name, role_id) => {
+    return jwt.sign({ id, name, role_id }, process.env.JWT_SECRET, { expiresIn: '1d' })
+}
 exports.createUser = async (req, res) => {
     try {
         const { name, email, password, status, role_id, last_login } = req.body
@@ -171,7 +175,15 @@ exports.Verify_OTP = async (req, res) => {
         if (find_users.dataValues.otp !== otp) {
             return res.status(400).json({ message: "Invalid OTP" });
         }
-        res.status(200).json({ messageL: 'user is verified' })
+        const genToken = generateToken(find_users.dataValues.id, find_users.dataValues.name, find_users.dataValues.role_id)
+        
+        
+        res.clearCookie('email')
+        res.cookie('token', genToken, {
+            httpOnly: true,
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+        res.status(200).json({ message: 'user is verified', token: genToken })
     } catch (error) {
         console.log(error)
         res.status(500).json({ message: 'some error is occured', error: error.mesage })
